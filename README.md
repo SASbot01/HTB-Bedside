@@ -55,7 +55,7 @@ Antes de los detalles técnicos, el marco mental que sigo. Toda la resolución r
 | Acto | Qué consigo | Fases |
 |---|---|---|
 | **1 — Foothold** | RCE en el portal `research` (pdfminer.six) → shell **dentro de un contenedor Docker** | 01–05 |
-| **2 — Container → host (user)** | Desde el contenedor alcanzo el host (`172.17.0.1:3000`, Vite dev) → lectura de fichero arbitraria → clave SSH de `developer` → SSH al host → `user.txt` | 06–07 |
+| **2 — Container → host (user)** | Desde el contenedor alcanzo el host (`172.17.0.1:3000`) → path traversal (`--path-as-is`) = lectura de ficheros del host → clave SSH de `developer` → SSH al host → `user.txt` | 06–07 |
 | **3 — Root** | `sudo -l` permite correr como root un script de entrenamiento que carga un checkpoint PyTorch/MONAI → deserialización (misma *bug class*) → checkpoint malicioso → `root.txt` | 08 |
 
 ---
@@ -70,9 +70,10 @@ Antes de los detalles técnicos, el marco mental que sigo. Toda la resolución r
 | [03](phases/phase-03-vhost-research.md) | Análisis del portal `research` (subida de archivos) | ✅ |
 | [04](phases/phase-04-upload-analysis.md) | Análisis del filtro de subida y superficie de ataque | ✅ |
 | [05](phases/phase-05-exploitation.md) | **Explotación → RCE → shell en el contenedor** (CVE-2025-64512) | ✅ |
-| [06](phases/phase-06-container-enum-pivot.md) | Dentro del contenedor: enumeración y pivot al host (puerto 3000) | ⏳ |
-| 07 | Lectura arbitraria en Vite dev → clave SSH de `developer` → `user.txt` | ⬜ |
-| 08 | Escalada a root vía checkpoint PyTorch/MONAI (deserialización) | ⬜ |
+| [06](phases/phase-06-container-enum-pivot.md) | Dentro del contenedor: enumeración y pivot al host (puerto 3000) | ✅ |
+| [07](phases/phase-07-host-file-read.md) | Path traversal en el 3000 → lectura de ficheros del host (`/etc/passwd`) | ⏳ |
+| 08 | Clave SSH de `developer` → SSH al host → `user.txt` | ⬜ |
+| 09 | Escalada a root vía checkpoint PyTorch/MONAI (deserialización) | ⬜ |
 
 ---
 
