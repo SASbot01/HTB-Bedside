@@ -1,0 +1,5 @@
+exploit/*.pickle.gz
+exploit/*.pdf
+exploit/*.zip
+exploit/payload*
+*.log
