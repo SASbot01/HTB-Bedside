@@ -3,3 +3,7 @@ exploit/*.pdf
 exploit/*.zip
 exploit/payload*
 *.log
+exploit/poc/*.pickle.gz
+exploit/poc/*.pdf
+exploit/poc/*.zip
+exploit/poc/*.bak
